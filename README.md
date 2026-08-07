@@ -42,6 +42,16 @@ Ensure you have Rust and Cargo installed on your system. On Linux systems, X11 o
 sudo apt-get install libx11-dev libxcb-shape0-dev libxcb-xfixes0-dev
 ```
 
+### Note on Ubuntu
+
+Ubuntu (GNOME) does not provide a clipboard history UI by default, which can be frustrating when coming from Windows. If you plan to use this app on Ubuntu, you may want to install a clipboard manager such as `copyq` to get history, pinning, and more reliable image/text handling:
+
+```bash
+sudo apt-get install copyq
+```
+
+Clipboard manager tools provide history, pinning, and improved clipboard behavior that complement this app on Linux.
+
 ### Run in Development Mode
 
 ```bash
