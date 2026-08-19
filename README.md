@@ -24,8 +24,9 @@ A high-performance Linux Desktop Clipboard Manager built in Rust using Iced for 
 
 ## Installation (Run as a Linux Desktop Application)
 
-To install Rusty Clipboard into your Linux desktop menu so you can launch it like any installed application:
+For complete system requirements, distribution package commands, and autostart setup, see [INSTALL.md](INSTALL.md).
 
+Quick installation:
 ```bash
 chmod +x install.sh
 ./install.sh
