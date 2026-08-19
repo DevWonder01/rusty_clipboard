@@ -2,7 +2,8 @@
 
 A high-performance Linux Desktop Clipboard Manager built in Rust using Iced for the user interface and heed (LMDB) for local key-value storage.
 
-![alt text](image-1.png)
+![Rusty Clipboard](assets/screenshot.png)
+
 ## Features
 
 - **Clipboard History**: Automatically monitors and saves copied text snippets and raw RGBA images from the system clipboard.
