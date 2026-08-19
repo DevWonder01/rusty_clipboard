@@ -36,6 +36,6 @@ fn main() -> iced::Result {
         ..Font::DEFAULT
     })
     .subscription(RustyClipboardApp::subscription)
-    .window_size((360.0, 560.0))
+    .window_size((500.0, 620.0))
     .run_with(move || RustyClipboardApp::new(db, receiver))
 }

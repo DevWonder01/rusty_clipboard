@@ -54,7 +54,6 @@ pub enum ActiveTab {
     Clipboard,
     Favorites,
     Emojis,
-    Kaomoji,
     Symbols,
 }
 
@@ -76,14 +75,4 @@ pub enum SymbolCategory {
     Punctuation,
     Arrows,
     Greek,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KaomojiCategory {
-    Happy,
-    Shrug,
-    Angry,
-    Surprised,
-    Sad,
-    Love,
 }

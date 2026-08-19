@@ -1,4 +1,4 @@
-use crate::types::{EmojiCategory, KaomojiCategory, SymbolCategory};
+use crate::types::{EmojiCategory, SymbolCategory};
 
 pub struct EmojiItem {
     pub char: &'static str,
@@ -10,11 +10,6 @@ pub struct SymbolItem {
     pub symbol: &'static str,
     pub name: &'static str,
     pub category: SymbolCategory,
-}
-
-pub struct KaomojiItem {
-    pub text: &'static str,
-    pub category: KaomojiCategory,
 }
 
 pub fn get_emojis() -> Vec<EmojiItem> {
@@ -260,47 +255,5 @@ pub fn get_symbols() -> Vec<SymbolItem> {
         SymbolItem { symbol: "τ", name: "tau", category: SymbolCategory::Greek },
         SymbolItem { symbol: "φ", name: "phi", category: SymbolCategory::Greek },
         SymbolItem { symbol: "ω", name: "omega", category: SymbolCategory::Greek },
-    ]
-}
-
-pub fn get_kaomojis() -> Vec<KaomojiItem> {
-    vec![
-        // Happy
-        KaomojiItem { text: "(⁠◕⁠ᴗ⁠◕⁠✿⁠)", category: KaomojiCategory::Happy },
-        KaomojiItem { text: "(⁠•⁠‿⁠•⁠)", category: KaomojiCategory::Happy },
-        KaomojiItem { text: "(⁠~⁠￣⁠³⁠￣⁠)⁠~", category: KaomojiCategory::Happy },
-        KaomojiItem { text: "(⁠◍⁠•⁠ᴗ⁠•⁠◍⁠)", category: KaomojiCategory::Happy },
-        KaomojiItem { text: "\\(⁠^⁠o⁠^⁠)/", category: KaomojiCategory::Happy },
-        KaomojiItem { text: "(⁠≧⁠▽⁠≦⁠)", category: KaomojiCategory::Happy },
-
-        // Shrug
-        KaomojiItem { text: "¯\\_(ツ)_/¯", category: KaomojiCategory::Shrug },
-        KaomojiItem { text: "┐(´∀｀)┌", category: KaomojiCategory::Shrug },
-        KaomojiItem { text: "┐(‘～`;)┌", category: KaomojiCategory::Shrug },
-        KaomojiItem { text: "╮(─▽─)╭", category: KaomojiCategory::Shrug },
-
-        // Angry
-        KaomojiItem { text: "(╯°□°）╯︵ ┻━┻", category: KaomojiCategory::Angry },
-        KaomojiItem { text: "(╬▔皿▔)╯", category: KaomojiCategory::Angry },
-        KaomojiItem { text: "┬─┬ノ( º _ ºノ)", category: KaomojiCategory::Angry },
-        KaomojiItem { text: "(ಠ_ಠ)", category: KaomojiCategory::Angry },
-
-        // Surprised
-        KaomojiItem { text: "(⁠⊙⁠_⁠⊙⁠)", category: KaomojiCategory::Surprised },
-        KaomojiItem { text: "(⁠O⁠_⁠o⁠)", category: KaomojiCategory::Surprised },
-        KaomojiItem { text: "Σ(°Location°)", category: KaomojiCategory::Surprised },
-        KaomojiItem { text: "(⁠゜⁠o⁠゜⁠)", category: KaomojiCategory::Surprised },
-
-        // Sad
-        KaomojiItem { text: "(╥﹏╥)", category: KaomojiCategory::Sad },
-        KaomojiItem { text: "(⁠༎ຶ⁠‿⁠༎ຶ⁠)", category: KaomojiCategory::Sad },
-        KaomojiItem { text: "(⁠p⁠_⁠q⁠)", category: KaomojiCategory::Sad },
-        KaomojiItem { text: "(⁠〒⁠﹏⁠〒⁠)", category: KaomojiCategory::Sad },
-
-        // Love
-        KaomojiItem { text: "(⁠*⁠˘⁠︶⁠˘⁠*⁠)⁠.⁠｡⁠*⁠♡", category: KaomojiCategory::Love },
-        KaomojiItem { text: "(⁠｡⁠・⁠//⁠ε⁠//⁠・⁠｡⁠)", category: KaomojiCategory::Love },
-        KaomojiItem { text: "(⁠♡⁠ω⁠♡⁠)⁠~⁠♪", category: KaomojiCategory::Love },
-        KaomojiItem { text: "(*￣3￣)╭", category: KaomojiCategory::Love },
     ]
 }

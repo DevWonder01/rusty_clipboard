@@ -9,11 +9,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::catalog::{get_emojis, get_kaomojis, get_symbols};
+use crate::catalog::{get_emojis, get_symbols};
 use crate::clipboard_listener::copy_item_to_clipboard;
 use crate::db::ClipboardDb;
 use crate::types::{
-    ActiveTab, ClipboardItem, EmojiCategory, ItemType, KaomojiCategory, SymbolCategory,
+    ActiveTab, ClipboardItem, EmojiCategory, ItemType, SymbolCategory,
 };
 
 pub const SYSTEM_FONT: Font = Font {
@@ -30,13 +30,25 @@ pub const EMOJI_FONT: Font = Font {
     style: iced::font::Style::Normal,
 };
 
+// --- Neutral Dark Theme Palette (Pure Onyx / Charcoal - No Blue) ---
+const COLOR_BG_APP: Color = Color::from_rgb(0.07, 0.07, 0.08);         // #121214 Deep Onyx Dark Background
+const COLOR_BG_CARD: Color = Color::from_rgb(0.12, 0.12, 0.14);        // #1F1F24 Card Neutral Surface
+const COLOR_BG_CARD_HOVER: Color = Color::from_rgb(0.18, 0.18, 0.21);  // #2E2E36 Elevated Surface Hover
+const COLOR_BORDER: Color = Color::from_rgb(0.20, 0.20, 0.23);         // #33333B Subtle Neutral Border
+const COLOR_BORDER_HOVER: Color = Color::from_rgb(0.38, 0.38, 0.42);   // #61616B Active Neutral Border
+const COLOR_ACCENT: Color = Color::from_rgb(0.24, 0.24, 0.28);         // #3D3D47 Neutral Active Tab Fill
+const COLOR_TEXT_PRIMARY: Color = Color::from_rgb(0.96, 0.96, 0.97);   // #F5F5F7 Crisp Off-White Text
+const COLOR_TEXT_SECONDARY: Color = Color::from_rgb(0.63, 0.63, 0.67); // #A1A1AA Neutral Light Gray
+const COLOR_TEXT_MUTED: Color = Color::from_rgb(0.44, 0.44, 0.48);     // #71717A Muted Gray
+const COLOR_PIN_ACTIVE: Color = Color::from_rgb(0.96, 0.62, 0.04);     // #F59E0B Warm Amber Gold
+const COLOR_DANGER: Color = Color::from_rgb(0.94, 0.27, 0.27);         // #EF4444 Red Danger
+
 #[derive(Debug, Clone)]
 pub enum Message {
     SelectTab(ActiveTab),
     SearchChanged(String),
     SelectEmojiCat(EmojiCategory),
     SelectSymbolCat(SymbolCategory),
-    SelectKaomojiCat(KaomojiCategory),
     CopyText(String),
     CopyItem(ClipboardItem),
     TogglePin(String),
@@ -55,7 +67,6 @@ pub struct RustyClipboardApp {
     toast_message: Option<(String, Instant)>,
     selected_emoji_cat: EmojiCategory,
     selected_symbol_cat: SymbolCategory,
-    selected_kaomoji_cat: KaomojiCategory,
     image_handles: HashMap<String, image::Handle>,
 }
 
@@ -74,7 +85,6 @@ impl RustyClipboardApp {
             toast_message: None,
             selected_emoji_cat: EmojiCategory::Smileys,
             selected_symbol_cat: SymbolCategory::Currency,
-            selected_kaomoji_cat: KaomojiCategory::Happy,
             image_handles: HashMap::new(),
         };
 
@@ -138,13 +148,15 @@ impl RustyClipboardApp {
             Message::SelectSymbolCat(cat) => {
                 self.selected_symbol_cat = cat;
             }
-            Message::SelectKaomojiCat(cat) => {
-                self.selected_kaomoji_cat = cat;
-            }
             Message::CopyText(txt) => {
                 if crate::clipboard_listener::copy_text_to_clipboard(&txt).is_ok() {
-                    let preview: String = txt.chars().take(20).collect();
-                    self.show_toast(format!("Copied \"{}\"", preview));
+                    let preview: String = txt.chars().take(24).collect();
+                    let display_text = if txt.chars().count() > 24 {
+                        format!("{}...", preview)
+                    } else {
+                        preview
+                    };
+                    self.show_toast(format!("Copied \"{}\"", display_text));
                 }
             }
             Message::CopyItem(item) => {
@@ -186,12 +198,12 @@ impl RustyClipboardApp {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        // Windows 11 Top handle bar
+        // Sleek Window handle indicator
         let handle_bar = container(Space::with_height(0))
-            .width(Length::Fixed(40.0))
+            .width(Length::Fixed(48.0))
             .height(Length::Fixed(4.0))
             .style(|_| container::Style {
-                background: Some(Color::from_rgb(0.7, 0.7, 0.73).into()),
+                background: Some(COLOR_BORDER.into()),
                 border: Border {
                     radius: 2.0.into(),
                     ..Default::default()
@@ -202,40 +214,40 @@ impl RustyClipboardApp {
         let top_drag = container(handle_bar)
             .width(Length::Fill)
             .align_x(alignment::Horizontal::Center)
-            .padding(Padding { top: 6.0, right: 0.0, bottom: 0.0, left: 0.0 });
+            .padding(Padding { top: 8.0, right: 0.0, bottom: 4.0, left: 0.0 });
 
-        // Navigation Tabs Header (GIFs tab removed per request)
+        // Navigation Tabs Header
         let tabs = [
-            (ActiveTab::Favorites, "📌 Pinned"),
-            (ActiveTab::Emojis, "😊 Emojis"),
-            (ActiveTab::Kaomoji, ";-) Kaomoji"),
-            (ActiveTab::Symbols, "½¼ Symbols"),
-            (ActiveTab::Clipboard, "📋 Clipboard"),
+            (ActiveTab::Clipboard, "Clipboard"),
+            (ActiveTab::Favorites, "Pinned"),
+            (ActiveTab::Emojis, "Emojis"),
+            (ActiveTab::Symbols, "Symbols"),
         ];
 
-        let mut tab_row = row![].spacing(4).align_y(alignment::Vertical::Center);
+        let mut tab_row = row![].spacing(6).align_y(alignment::Vertical::Center);
         for (tab, label) in tabs {
             let is_sel = self.active_tab == tab;
             let tab_btn = button(
                 text(label)
                     .font(SYSTEM_FONT)
-                    .size(12)
-                    .color(if is_sel { Color::from_rgb(0.0, 0.4, 0.75) } else { Color::from_rgb(0.3, 0.3, 0.35) }),
+                    .size(13)
+                    .color(if is_sel { Color::from_rgb(0.07, 0.07, 0.08) } else { COLOR_TEXT_SECONDARY }),
             )
-            .padding([5.0, 8.0])
+            .padding([7.0, 14.0])
             .style(move |_, status| {
                 let bg = if is_sel {
-                    Color::from_rgb(0.9, 0.92, 0.96)
+                    Color::from_rgb(0.89, 0.89, 0.91)
                 } else if status == button::Status::Hovered {
-                    Color::from_rgb(0.95, 0.95, 0.97)
+                    COLOR_BG_CARD_HOVER
                 } else {
-                    Color::TRANSPARENT
+                    COLOR_BG_CARD
                 };
                 button::Style {
                     background: Some(bg.into()),
                     border: Border {
-                        radius: 6.0.into(),
-                        ..Default::default()
+                        radius: 8.0.into(),
+                        width: 1.0,
+                        color: if is_sel { Color::from_rgb(0.89, 0.89, 0.91) } else { COLOR_BORDER },
                     },
                     ..Default::default()
                 }
@@ -249,34 +261,40 @@ impl RustyClipboardApp {
             scrollable(tab_row)
                 .direction(scrollable::Direction::Horizontal(scrollable::Scrollbar::default()))
         )
-        .padding([2.0, 4.0])
+        .padding([4.0, 16.0])
         .width(Length::Fill);
 
-        // Search Input
-        let search_bar = text_input("Search history & items...", &self.search_query)
+        // Search Input Field
+        let search_bar = text_input("Search history, emojis, symbols...", &self.search_query)
             .on_input(Message::SearchChanged)
-            .padding([8.0, 12.0])
+            .padding([10.0, 14.0])
             .font(SYSTEM_FONT)
             .size(13)
-            .style(|_, _| text_input::Style {
-                background: Color::WHITE.into(),
-                border: Border {
-                    radius: 6.0.into(),
-                    width: 1.0,
-                    color: Color::from_rgb(0.85, 0.85, 0.88),
-                },
-                value: Color::BLACK,
-                placeholder: Color::from_rgb(0.6, 0.6, 0.6),
-                selection: Color::from_rgb(0.7, 0.85, 1.0),
-                icon: Color::from_rgb(0.5, 0.5, 0.5),
+            .style(|_, status| {
+                let border_color = if status == text_input::Status::Focused {
+                    COLOR_ACCENT
+                } else {
+                    COLOR_BORDER
+                };
+                text_input::Style {
+                    background: COLOR_BG_CARD.into(),
+                    border: Border {
+                        radius: 8.0.into(),
+                        width: 1.0,
+                        color: border_color,
+                    },
+                    value: COLOR_TEXT_PRIMARY,
+                    placeholder: COLOR_TEXT_MUTED,
+                    selection: COLOR_ACCENT,
+                    icon: COLOR_TEXT_MUTED,
+                }
             });
 
-        // Content Area
+        // Content View per Active Tab
         let content: Element<Message> = match self.active_tab {
             ActiveTab::Clipboard => self.view_clipboard_history(),
             ActiveTab::Favorites => self.view_favorites(),
             ActiveTab::Emojis => self.view_emojis(),
-            ActiveTab::Kaomoji => self.view_kaomoji(),
             ActiveTab::Symbols => self.view_symbols(),
         };
 
@@ -284,36 +302,55 @@ impl RustyClipboardApp {
             top_drag,
             Space::with_height(4),
             nav_bar,
-            Space::with_height(6),
-            container(search_bar).padding(Padding { top: 0.0, right: 12.0, bottom: 0.0, left: 12.0 }),
-            Space::with_height(10),
+            Space::with_height(8),
+            container(search_bar).padding(Padding { top: 0.0, right: 16.0, bottom: 0.0, left: 16.0 }),
+            Space::with_height(12),
             container(content)
                 .width(Length::Fill)
                 .height(Length::Fill)
-                .padding(Padding { top: 0.0, right: 12.0, bottom: 0.0, left: 12.0 })
+                .padding(Padding { top: 0.0, right: 16.0, bottom: 0.0, left: 16.0 })
         ]
         .width(Length::Fill)
         .height(Length::Fill);
 
-        // Toast at bottom
+        // Toast Popup Notification at Bottom
         if let Some((msg, created_at)) = &self.toast_message {
             if created_at.elapsed() < Duration::from_secs(2) {
                 let toast_box = container(
-                    text(format!("✓ {}", msg))
-                        .font(SYSTEM_FONT)
-                        .size(12)
-                        .color(Color::WHITE),
+                    row![
+                        text("✓")
+                            .font(SYSTEM_FONT)
+                            .size(13)
+                            .color(Color::from_rgb(0.2, 0.85, 0.5)),
+                        Space::with_width(8),
+                        text(msg)
+                            .font(SYSTEM_FONT)
+                            .size(12)
+                            .color(COLOR_TEXT_PRIMARY),
+                    ]
+                    .align_y(alignment::Vertical::Center)
                 )
-                .padding(Padding { top: 8.0, right: 12.0, bottom: 8.0, left: 12.0 })
+                .padding(Padding { top: 8.0, right: 16.0, bottom: 8.0, left: 16.0 })
                 .style(|_| container::Style {
-                    background: Some(Color::from_rgb(0.15, 0.15, 0.18).into()),
+                    background: Some(Color::from_rgb(0.06, 0.22, 0.16).into()),
                     border: Border {
-                        radius: 6.0.into(),
-                        ..Default::default()
+                        radius: 8.0.into(),
+                        width: 1.0,
+                        color: Color::from_rgb(0.1, 0.6, 0.4),
+                    },
+                    shadow: iced::Shadow {
+                        color: Color::from_rgba(0.0, 0.0, 0.0, 0.3),
+                        offset: Vector::new(0.0, 4.0),
+                        blur_radius: 8.0,
                     },
                     ..Default::default()
                 });
-                main_col = main_col.push(container(toast_box).padding(8.0));
+                main_col = main_col.push(
+                    container(toast_box)
+                        .padding(12.0)
+                        .align_x(alignment::Horizontal::Center)
+                        .width(Length::Fill)
+                );
             }
         }
 
@@ -321,7 +358,7 @@ impl RustyClipboardApp {
             .width(Length::Fill)
             .height(Length::Fill)
             .style(|_| container::Style {
-                background: Some(Color::from_rgb(0.95, 0.95, 0.97).into()),
+                background: Some(COLOR_BG_APP.into()),
                 ..Default::default()
             })
             .into()
@@ -329,23 +366,36 @@ impl RustyClipboardApp {
 
     fn view_clipboard_history(&self) -> Element<'_, Message> {
         let header_row = row![
-            text("Clipboard")
+            text("Clipboard History")
                 .font(SYSTEM_FONT)
-                .size(16)
-                .color(Color::from_rgb(0.15, 0.15, 0.18)),
+                .size(15)
+                .color(COLOR_TEXT_PRIMARY),
             Space::with_width(Length::Fill),
-            button(text("Clear all").font(SYSTEM_FONT).size(12).color(Color::from_rgb(0.25, 0.25, 0.28)))
-                .padding([6.0, 12.0])
-                .style(|_, _| button::Style {
-                    background: Some(Color::WHITE.into()),
+            button(
+                text("Clear unpinned")
+                    .font(SYSTEM_FONT)
+                    .size(12)
+                    .color(COLOR_TEXT_SECONDARY)
+            )
+            .padding([6.0, 12.0])
+            .style(|_, status| {
+                let (bg, text_col, border_col) = if status == button::Status::Hovered {
+                    (Color::from_rgb(0.25, 0.12, 0.14), COLOR_DANGER, COLOR_DANGER)
+                } else {
+                    (COLOR_BG_CARD, COLOR_TEXT_SECONDARY, COLOR_BORDER)
+                };
+                button::Style {
+                    background: Some(bg.into()),
                     border: Border {
                         radius: 6.0.into(),
                         width: 1.0,
-                        color: Color::from_rgb(0.85, 0.85, 0.88),
+                        color: border_col,
                     },
+                    text_color: text_col,
                     ..Default::default()
-                })
-                .on_press(Message::ClearUnpinned)
+                }
+            })
+            .on_press(Message::ClearUnpinned)
         ]
         .align_y(alignment::Vertical::Center);
 
@@ -366,22 +416,21 @@ impl RustyClipboardApp {
 
         if filtered.is_empty() {
             let empty_view = column![
-                Space::with_height(40),
-                text("📋").font(SYSTEM_FONT).size(32),
-                Space::with_height(8),
-                text("Your clipboard history is empty")
+                Space::with_height(60),
+                text("Clipboard Empty")
                     .font(SYSTEM_FONT)
-                    .size(14)
-                    .color(Color::from_rgb(0.4, 0.4, 0.45)),
-                text("Copied text and images will appear here")
+                    .size(16)
+                    .color(COLOR_TEXT_SECONDARY),
+                Space::with_height(6),
+                text("Copied text and images will automatically appear here")
                     .font(SYSTEM_FONT)
                     .size(12)
-                    .color(Color::from_rgb(0.6, 0.6, 0.65)),
+                    .color(COLOR_TEXT_MUTED),
             ]
             .align_x(alignment::Horizontal::Center)
             .width(Length::Fill);
 
-            return column![header_row, Space::with_height(10), empty_view].into();
+            return column![header_row, Space::with_height(12), empty_view].into();
         }
 
         let mut cards_col = column![].spacing(10);
@@ -402,17 +451,16 @@ impl RustyClipboardApp {
 
         if pinned_items.is_empty() {
             let empty_view = column![
-                Space::with_height(40),
-                text("📌").font(SYSTEM_FONT).size(32),
-                Space::with_height(8),
-                text("No pinned items yet")
+                Space::with_height(60),
+                text("No Pinned Items")
                     .font(SYSTEM_FONT)
-                    .size(14)
-                    .color(Color::from_rgb(0.4, 0.4, 0.45)),
-                text("Pin items in Clipboard tab to keep them safe")
+                    .size(16)
+                    .color(COLOR_TEXT_SECONDARY),
+                Space::with_height(6),
+                text("Click the Pin button on any item in Clipboard tab to save it here")
                     .font(SYSTEM_FONT)
                     .size(12)
-                    .color(Color::from_rgb(0.6, 0.6, 0.65)),
+                    .color(COLOR_TEXT_MUTED),
             ]
             .align_x(alignment::Horizontal::Center)
             .width(Length::Fill);
@@ -431,83 +479,121 @@ impl RustyClipboardApp {
     fn render_card<'a>(&'a self, item: &'a ClipboardItem) -> Element<'a, Message> {
         let content_element: Element<'a, Message> = match &item.item_type {
             ItemType::Text(t) => {
-                let lines: Vec<&str> = t.lines().take(4).collect();
+                let lines: Vec<&str> = t.lines().take(5).collect();
                 let snippet = lines.join("\n");
                 text(snippet)
                     .font(SYSTEM_FONT)
                     .size(13)
-                    .color(Color::from_rgb(0.15, 0.15, 0.18))
+                    .color(COLOR_TEXT_PRIMARY)
                     .into()
             }
             ItemType::Image { width, height, .. } => {
                 if let Some(handle) = self.image_handles.get(&item.id) {
                     column![
-                        image(handle.clone()).width(Length::Fixed(240.0)),
+                        image(handle.clone()).width(Length::Fixed(320.0)),
                         Space::with_height(4),
                         text(format!("Image ({} × {})", width, height))
                             .font(SYSTEM_FONT)
                             .size(11)
-                            .color(Color::from_rgb(0.5, 0.5, 0.5))
+                            .color(COLOR_TEXT_MUTED)
                     ]
                     .into()
                 } else {
                     text(format!("[Image {}×{}]", width, height))
                         .font(SYSTEM_FONT)
                         .size(13)
+                        .color(COLOR_TEXT_SECONDARY)
                         .into()
                 }
             }
         };
 
-        let pin_color = if item.pinned {
-            Color::from_rgb(0.0, 0.4, 0.75)
+        let pin_label = if item.pinned { "Pinned" } else { "Pin" };
+        let pin_text_color = if item.pinned {
+            COLOR_PIN_ACTIVE
         } else {
-            Color::from_rgb(0.6, 0.6, 0.65)
+            COLOR_TEXT_MUTED
         };
 
         let card_body = column![
             row![
                 container(content_element).width(Length::Fill),
-                button(text("🗑").font(SYSTEM_FONT).size(12))
-                    .padding(4.0)
-                    .style(|_, _| button::Style {
-                        background: Some(Color::TRANSPARENT.into()),
+                button(text("Delete").font(SYSTEM_FONT).size(11).color(COLOR_TEXT_MUTED))
+                    .padding([4.0, 8.0])
+                    .style(|_, status| button::Style {
+                        background: Some(
+                            if status == button::Status::Hovered {
+                                Color::from_rgb(0.25, 0.12, 0.14)
+                            } else {
+                                Color::TRANSPARENT
+                            }
+                            .into(),
+                        ),
+                        border: Border {
+                            radius: 4.0.into(),
+                            ..Default::default()
+                        },
+                        text_color: if status == button::Status::Hovered { COLOR_DANGER } else { COLOR_TEXT_MUTED },
                         ..Default::default()
                     })
                     .on_press(Message::DeleteItem(item.id.clone()))
             ],
-            Space::with_height(6),
+            Space::with_height(8),
             row![
                 Space::with_width(Length::Fill),
-                button(text("📌").font(SYSTEM_FONT).size(14).color(pin_color))
-                    .padding(4.0)
-                    .style(|_, _| button::Style {
-                        background: Some(Color::TRANSPARENT.into()),
-                        ..Default::default()
-                    })
-                    .on_press(Message::TogglePin(item.id.clone()))
+                button(
+                    text(pin_label)
+                        .font(SYSTEM_FONT)
+                        .size(11)
+                        .color(pin_text_color)
+                )
+                .padding([4.0, 8.0])
+                .style(move |_, status| button::Style {
+                    background: Some(
+                        if status == button::Status::Hovered {
+                            Color::from_rgb(0.2, 0.22, 0.3)
+                        } else {
+                            Color::TRANSPARENT
+                        }
+                        .into(),
+                    ),
+                    border: Border {
+                        radius: 4.0.into(),
+                        width: 1.0,
+                        color: if item.pinned { COLOR_PIN_ACTIVE } else { COLOR_BORDER },
+                    },
+                    ..Default::default()
+                })
+                .on_press(Message::TogglePin(item.id.clone()))
             ]
         ];
 
         let item_clone = item.clone();
         button(card_body)
             .width(Length::Fill)
-            .padding(12.0)
+            .padding(14.0)
             .style(|_, status| button::Style {
-                background: Some(Color::WHITE.into()),
+                background: Some(
+                    if status == button::Status::Hovered {
+                        COLOR_BG_CARD_HOVER
+                    } else {
+                        COLOR_BG_CARD
+                    }
+                    .into(),
+                ),
                 border: Border {
-                    radius: 8.0.into(),
+                    radius: 10.0.into(),
                     width: 1.0,
                     color: if status == button::Status::Hovered {
-                        Color::from_rgb(0.0, 0.4, 0.75)
+                        COLOR_BORDER_HOVER
                     } else {
-                        Color::from_rgb(0.88, 0.88, 0.9)
+                        COLOR_BORDER
                     },
                 },
                 shadow: iced::Shadow {
-                    color: Color::from_rgba(0.0, 0.0, 0.0, 0.04),
+                    color: Color::from_rgba(0.0, 0.0, 0.0, 0.2),
                     offset: Vector::new(0.0, 2.0),
-                    blur_radius: 4.0,
+                    blur_radius: 6.0,
                 },
                 ..Default::default()
             })
@@ -526,32 +612,31 @@ impl RustyClipboardApp {
             (EmojiCategory::Symbols, "Symbols"),
         ];
 
-        let mut cat_row = row![].spacing(4);
+        let mut cat_row = row![].spacing(6);
         for (cat, label) in categories {
             let is_sel = self.selected_emoji_cat == cat;
             let cat_btn = button(
                 text(label)
                     .font(SYSTEM_FONT)
                     .size(11)
-                    .color(if is_sel {
-                        Color::from_rgb(0.0, 0.4, 0.75)
-                    } else {
-                        Color::from_rgb(0.3, 0.3, 0.35)
-                    }),
+                    .color(if is_sel { Color::from_rgb(0.07, 0.07, 0.08) } else { COLOR_TEXT_MUTED }),
             )
-            .padding([4.0, 8.0])
-            .style(move |_, _| button::Style {
+            .padding([5.0, 10.0])
+            .style(move |_, status| button::Style {
                 background: Some(
                     if is_sel {
-                        Color::from_rgb(0.9, 0.92, 0.96)
+                        Color::from_rgb(0.89, 0.89, 0.91)
+                    } else if status == button::Status::Hovered {
+                        COLOR_BG_CARD_HOVER
                     } else {
-                        Color::TRANSPARENT
+                        COLOR_BG_CARD
                     }
                     .into(),
                 ),
                 border: Border {
                     radius: 6.0.into(),
-                    ..Default::default()
+                    width: 1.0,
+                    color: if is_sel { Color::from_rgb(0.89, 0.89, 0.91) } else { COLOR_BORDER },
                 },
                 ..Default::default()
             })
@@ -567,126 +652,36 @@ impl RustyClipboardApp {
             .filter(|e| query.is_empty() || e.name.contains(&query) || e.char.contains(&query))
             .collect();
 
-        let mut grid_row = row![].spacing(6);
-        let mut grid_col = column![].spacing(6);
+        let mut grid_row = row![].spacing(8);
+        let mut grid_col = column![].spacing(8);
 
         for (idx, e) in emojis.into_iter().enumerate() {
-            let e_btn = button(text(e.char).font(EMOJI_FONT).size(20))
-                .padding(6.0)
+            let e_btn = button(text(e.char).font(EMOJI_FONT).size(22))
+                .padding(8.0)
                 .style(|_, status| button::Style {
                     background: Some(
                         if status == button::Status::Hovered {
-                            Color::from_rgb(0.92, 0.94, 0.98)
+                            COLOR_BG_CARD_HOVER
                         } else {
-                            Color::WHITE
+                            COLOR_BG_CARD
                         }
                         .into(),
                     ),
                     border: Border {
-                        radius: 6.0.into(),
+                        radius: 8.0.into(),
                         width: 1.0,
-                        color: Color::from_rgb(0.88, 0.88, 0.9),
+                        color: if status == button::Status::Hovered {
+                            COLOR_BORDER_HOVER
+                        } else {
+                            COLOR_BORDER
+                        },
                     },
                     ..Default::default()
                 })
                 .on_press(Message::CopyText(e.char.to_string()));
 
             grid_row = grid_row.push(e_btn);
-            if (idx + 1) % 6 == 0 {
-                grid_col = grid_col.push(grid_row);
-                grid_row = row![].spacing(6);
-            }
-        }
-        grid_col = grid_col.push(grid_row);
-
-        column![
-            scrollable(cat_row).direction(scrollable::Direction::Horizontal(scrollable::Scrollbar::default())),
-            Space::with_height(8),
-            scrollable(grid_col).height(Length::Fill)
-        ]
-        .into()
-    }
-
-    fn view_kaomoji(&self) -> Element<'_, Message> {
-        let categories = [
-            (KaomojiCategory::Happy, "Happy"),
-            (KaomojiCategory::Shrug, "Shrug"),
-            (KaomojiCategory::Angry, "Angry"),
-            (KaomojiCategory::Surprised, "Surprised"),
-            (KaomojiCategory::Sad, "Sad"),
-            (KaomojiCategory::Love, "Love"),
-        ];
-
-        let mut cat_row = row![].spacing(4);
-        for (cat, label) in categories {
-            let is_sel = self.selected_kaomoji_cat == cat;
-            let cat_btn = button(
-                text(label)
-                    .font(SYSTEM_FONT)
-                    .size(11)
-                    .color(if is_sel {
-                        Color::from_rgb(0.0, 0.4, 0.75)
-                    } else {
-                        Color::from_rgb(0.3, 0.3, 0.35)
-                    }),
-            )
-            .padding([4.0, 8.0])
-            .style(move |_, _| button::Style {
-                background: Some(
-                    if is_sel {
-                        Color::from_rgb(0.9, 0.92, 0.96)
-                    } else {
-                        Color::TRANSPARENT
-                    }
-                    .into(),
-                ),
-                border: Border {
-                    radius: 6.0.into(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .on_press(Message::SelectKaomojiCat(cat));
-
-            cat_row = cat_row.push(cat_btn);
-        }
-
-        let kaomojis: Vec<_> = get_kaomojis()
-            .into_iter()
-            .filter(|k| k.category == self.selected_kaomoji_cat)
-            .collect();
-
-        let mut grid_row = row![].spacing(8);
-        let mut grid_col = column![].spacing(8);
-
-        for (idx, k) in kaomojis.into_iter().enumerate() {
-            let k_btn = button(
-                text(k.text)
-                    .font(SYSTEM_FONT)
-                    .size(12)
-                    .color(Color::from_rgb(0.2, 0.2, 0.22)),
-            )
-            .padding([8.0, 12.0])
-            .style(|_, status| button::Style {
-                background: Some(
-                    if status == button::Status::Hovered {
-                        Color::from_rgb(0.92, 0.94, 0.98)
-                    } else {
-                        Color::WHITE
-                    }
-                    .into(),
-                ),
-                border: Border {
-                    radius: 6.0.into(),
-                    width: 1.0,
-                    color: Color::from_rgb(0.88, 0.88, 0.9),
-                },
-                ..Default::default()
-            })
-            .on_press(Message::CopyText(k.text.to_string()));
-
-            grid_row = grid_row.push(k_btn);
-            if (idx + 1) % 2 == 0 {
+            if (idx + 1) % 8 == 0 {
                 grid_col = grid_col.push(grid_row);
                 grid_row = row![].spacing(8);
             }
@@ -695,7 +690,7 @@ impl RustyClipboardApp {
 
         column![
             scrollable(cat_row).direction(scrollable::Direction::Horizontal(scrollable::Scrollbar::default())),
-            Space::with_height(8),
+            Space::with_height(10),
             scrollable(grid_col).height(Length::Fill)
         ]
         .into()
@@ -710,32 +705,31 @@ impl RustyClipboardApp {
             (SymbolCategory::Greek, "Greek"),
         ];
 
-        let mut cat_row = row![].spacing(4);
+        let mut cat_row = row![].spacing(6);
         for (cat, label) in categories {
             let is_sel = self.selected_symbol_cat == cat;
             let cat_btn = button(
                 text(label)
                     .font(SYSTEM_FONT)
                     .size(11)
-                    .color(if is_sel {
-                        Color::from_rgb(0.0, 0.4, 0.75)
-                    } else {
-                        Color::from_rgb(0.3, 0.3, 0.35)
-                    }),
+                    .color(if is_sel { Color::from_rgb(0.07, 0.07, 0.08) } else { COLOR_TEXT_MUTED }),
             )
-            .padding([4.0, 8.0])
-            .style(move |_, _| button::Style {
+            .padding([5.0, 10.0])
+            .style(move |_, status| button::Style {
                 background: Some(
                     if is_sel {
-                        Color::from_rgb(0.9, 0.92, 0.96)
+                        Color::from_rgb(0.89, 0.89, 0.91)
+                    } else if status == button::Status::Hovered {
+                        COLOR_BG_CARD_HOVER
                     } else {
-                        Color::TRANSPARENT
+                        COLOR_BG_CARD
                     }
                     .into(),
                 ),
                 border: Border {
                     radius: 6.0.into(),
-                    ..Default::default()
+                    width: 1.0,
+                    color: if is_sel { Color::from_rgb(0.89, 0.89, 0.91) } else { COLOR_BORDER },
                 },
                 ..Default::default()
             })
@@ -751,41 +745,50 @@ impl RustyClipboardApp {
             .filter(|s| query.is_empty() || s.name.contains(&query) || s.symbol.contains(&query))
             .collect();
 
-        let mut grid_row = row![].spacing(6);
-        let mut grid_col = column![].spacing(6);
+        let mut grid_row = row![].spacing(8);
+        let mut grid_col = column![].spacing(8);
 
         for (idx, sym) in symbols.into_iter().enumerate() {
-            let sym_btn = button(text(sym.symbol).font(SYSTEM_FONT).size(16))
-                .padding(6.0)
-                .style(|_, status| button::Style {
-                    background: Some(
-                        if status == button::Status::Hovered {
-                            Color::from_rgb(0.92, 0.94, 0.98)
-                        } else {
-                            Color::WHITE
-                        }
-                        .into(),
-                    ),
-                    border: Border {
-                        radius: 6.0.into(),
-                        width: 1.0,
-                        color: Color::from_rgb(0.88, 0.88, 0.9),
+            let sym_btn = button(
+                text(sym.symbol)
+                    .font(SYSTEM_FONT)
+                    .size(18)
+                    .color(COLOR_TEXT_PRIMARY)
+            )
+            .padding(10.0)
+            .style(|_, status| button::Style {
+                background: Some(
+                    if status == button::Status::Hovered {
+                        COLOR_BG_CARD_HOVER
+                    } else {
+                        COLOR_BG_CARD
+                    }
+                    .into(),
+                ),
+                border: Border {
+                    radius: 8.0.into(),
+                    width: 1.0,
+                    color: if status == button::Status::Hovered {
+                        COLOR_BORDER_HOVER
+                    } else {
+                        COLOR_BORDER
                     },
-                    ..Default::default()
-                })
-                .on_press(Message::CopyText(sym.symbol.to_string()));
+                },
+                ..Default::default()
+            })
+            .on_press(Message::CopyText(sym.symbol.to_string()));
 
             grid_row = grid_row.push(sym_btn);
-            if (idx + 1) % 6 == 0 {
+            if (idx + 1) % 8 == 0 {
                 grid_col = grid_col.push(grid_row);
-                grid_row = row![].spacing(6);
+                grid_row = row![].spacing(8);
             }
         }
         grid_col = grid_col.push(grid_row);
 
         column![
             scrollable(cat_row).direction(scrollable::Direction::Horizontal(scrollable::Scrollbar::default())),
-            Space::with_height(8),
+            Space::with_height(10),
             scrollable(grid_col).height(Length::Fill)
         ]
         .into()

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Rusty Clipboard
+Comment=Professional Clipboard Manager & Symbol Picker
+Exec=rusty_clipboard
+Icon=rusty-clipboard
+Terminal=false
+Categories=Utility;System;Clipboard;
+StartupWMClass=rusty_clipboard
+Keywords=clipboard;copy;paste;history;emoji;symbols;
