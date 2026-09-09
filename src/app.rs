@@ -5,7 +5,6 @@ use iced::widget::{
 use iced::{
     alignment, Border, Color, Element, Font, Length, Padding, Subscription, Task, Vector,
 };
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -50,11 +49,10 @@ pub enum Message {
     SelectEmojiCat(EmojiCategory),
     SelectSymbolCat(SymbolCategory),
     CopyText(String),
-    CopyItem(ClipboardItem),
+    CopyItem(String),
     TogglePin(String),
     DeleteItem(String),
     ClearUnpinned,
-    FontLoaded(Result<(), iced::font::Error>),
     Tick,
 }
 
@@ -67,7 +65,6 @@ pub struct RustyClipboardApp {
     toast_message: Option<(String, Instant)>,
     selected_emoji_cat: EmojiCategory,
     selected_symbol_cat: SymbolCategory,
-    image_handles: HashMap<String, image::Handle>,
 }
 
 impl RustyClipboardApp {
@@ -76,7 +73,7 @@ impl RustyClipboardApp {
         receiver: crossbeam_channel::Receiver<ClipboardItem>,
     ) -> (Self, Task<Message>) {
         let initial_items = db.get_all_items().unwrap_or_default();
-        let mut app = Self {
+        let app = Self {
             db,
             receiver,
             items: initial_items,
@@ -85,42 +82,9 @@ impl RustyClipboardApp {
             toast_message: None,
             selected_emoji_cat: EmojiCategory::Smileys,
             selected_symbol_cat: SymbolCategory::Currency,
-            image_handles: HashMap::new(),
         };
 
-        app.build_image_handles();
-
-        // Load system Noto Emoji & Symbols TTF fonts into Iced
-        let font_paths = [
-            "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
-            "/usr/share/fonts/truetype/noto/NotoSansSymbols-Regular.ttf",
-            "/usr/share/fonts/truetype/noto/NotoSansSymbols2-Regular.ttf",
-        ];
-
-        let mut tasks = Vec::new();
-        for path in font_paths {
-            if let Ok(bytes) = std::fs::read(path) {
-                tasks.push(iced::font::load(bytes).map(Message::FontLoaded));
-            }
-        }
-
-        (app, Task::batch(tasks))
-    }
-
-    fn build_image_handles(&mut self) {
-        for item in &self.items {
-            if let ItemType::Image {
-                width,
-                height,
-                rgba_bytes,
-            } = &item.item_type
-            {
-                if !self.image_handles.contains_key(&item.id) {
-                    let handle = image::Handle::from_rgba(*width, *height, rgba_bytes.clone());
-                    self.image_handles.insert(item.id.clone(), handle);
-                }
-            }
-        }
+        (app, Task::none())
     }
 
     fn show_toast(&mut self, msg: impl Into<String>) {
@@ -130,7 +94,6 @@ impl RustyClipboardApp {
     fn refresh_items(&mut self) {
         if let Ok(latest) = self.db.get_all_items() {
             self.items = latest;
-            self.build_image_handles();
         }
     }
 
@@ -159,9 +122,11 @@ impl RustyClipboardApp {
                     self.show_toast(format!("Copied \"{}\"", display_text));
                 }
             }
-            Message::CopyItem(item) => {
-                if copy_item_to_clipboard(&item).is_ok() {
-                    self.show_toast("Copied item to clipboard!");
+            Message::CopyItem(id) => {
+                if let Some(item) = self.items.iter().find(|i| i.id == id) {
+                    if copy_item_to_clipboard(item).is_ok() {
+                        self.show_toast("Copied item to clipboard!");
+                    }
                 }
             }
             Message::TogglePin(id) => {
@@ -170,23 +135,35 @@ impl RustyClipboardApp {
             }
             Message::DeleteItem(id) => {
                 let _ = self.db.delete_item(&id);
-                self.refresh_items();
+                self.items.retain(|i| i.id != id);
                 self.show_toast("Item deleted");
             }
             Message::ClearUnpinned => {
                 let _ = self.db.clear_unpinned();
-                self.refresh_items();
+                self.items.retain(|i| i.pinned);
                 self.show_toast("Cleared unpinned history");
             }
-            Message::FontLoaded(_) => {}
             Message::Tick => {
                 let mut new_received = false;
                 while let Ok(item) = self.receiver.try_recv() {
                     let _ = self.db.save_item(&item);
+                    self.items.retain(|i| i.id != item.id);
+                    self.items.insert(0, item);
                     new_received = true;
                 }
                 if new_received {
-                    self.refresh_items();
+                    let unpinned_count = self.items.iter().filter(|i| !i.pinned).count();
+                    if unpinned_count > 100 {
+                        let mut current_unpinned = 0;
+                        self.items.retain(|i| {
+                            if i.pinned {
+                                true
+                            } else {
+                                current_unpinned += 1;
+                                current_unpinned <= 100
+                            }
+                        });
+                    }
                 }
             }
         }
@@ -487,24 +464,17 @@ impl RustyClipboardApp {
                     .color(COLOR_TEXT_PRIMARY)
                     .into()
             }
-            ItemType::Image { width, height, .. } => {
-                if let Some(handle) = self.image_handles.get(&item.id) {
-                    column![
-                        image(handle.clone()).width(Length::Fixed(320.0)),
-                        Space::with_height(4),
-                        text(format!("Image ({} × {})", width, height))
-                            .font(SYSTEM_FONT)
-                            .size(11)
-                            .color(COLOR_TEXT_MUTED)
-                    ]
-                    .into()
-                } else {
-                    text(format!("[Image {}×{}]", width, height))
+            ItemType::Image { width, height, png_bytes } => {
+                let handle = image::Handle::from_bytes(png_bytes.clone());
+                column![
+                    image(handle).width(Length::Fixed(320.0)),
+                    Space::with_height(4),
+                    text(format!("Image ({} × {})", width, height))
                         .font(SYSTEM_FONT)
-                        .size(13)
-                        .color(COLOR_TEXT_SECONDARY)
-                        .into()
-                }
+                        .size(11)
+                        .color(COLOR_TEXT_MUTED)
+                ]
+                .into()
             }
         };
 
@@ -568,7 +538,7 @@ impl RustyClipboardApp {
             ]
         ];
 
-        let item_clone = item.clone();
+        let id = item.id.clone();
         button(card_body)
             .width(Length::Fill)
             .padding(14.0)
@@ -597,7 +567,7 @@ impl RustyClipboardApp {
                 },
                 ..Default::default()
             })
-            .on_press(Message::CopyItem(item_clone))
+            .on_press(Message::CopyItem(id))
             .into()
     }
 
@@ -647,7 +617,7 @@ impl RustyClipboardApp {
 
         let query = self.search_query.trim().to_lowercase();
         let emojis: Vec<_> = get_emojis()
-            .into_iter()
+            .iter()
             .filter(|e| e.category == self.selected_emoji_cat)
             .filter(|e| query.is_empty() || e.name.contains(&query) || e.char.contains(&query))
             .collect();
@@ -740,7 +710,7 @@ impl RustyClipboardApp {
 
         let query = self.search_query.trim().to_lowercase();
         let symbols: Vec<_> = get_symbols()
-            .into_iter()
+            .iter()
             .filter(|s| s.category == self.selected_symbol_cat)
             .filter(|s| query.is_empty() || s.name.contains(&query) || s.symbol.contains(&query))
             .collect();

@@ -18,7 +18,7 @@ impl ClipboardDb {
 
         let env = unsafe {
             EnvOpenOptions::new()
-                .map_size(5 * 1024 * 1024 * 1024) // 5GB max virtual address space for LMDB
+                .map_size(128 * 1024 * 1024) // 128MB max virtual address space for LMDB
                 .max_dbs(5)
                 .open(&db_dir)?
         };
@@ -35,6 +35,21 @@ impl ClipboardDb {
         let bytes = serde_json::to_vec(item)?;
         self.db.put(&mut wtx, &item.id, &bytes)?;
         wtx.commit()?;
+        let _ = self.prune_old_unpinned(100);
+        Ok(())
+    }
+
+    pub fn prune_old_unpinned(&self, max_unpinned: usize) -> Result<(), Box<dyn std::error::Error>> {
+        let items = self.get_all_items()?;
+        let unpinned: Vec<_> = items.iter().filter(|i| !i.pinned).collect();
+        if unpinned.len() > max_unpinned {
+            let to_remove = &unpinned[max_unpinned..];
+            let mut wtx = self.env.write_txn()?;
+            for item in to_remove {
+                let _ = self.db.delete(&mut wtx, &item.id);
+            }
+            wtx.commit()?;
+        }
         Ok(())
     }
 

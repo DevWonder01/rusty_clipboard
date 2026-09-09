@@ -2,12 +2,23 @@ use arboard::Clipboard;
 use crossbeam_channel::Sender;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::io::Cursor;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
 use crate::types::{ClipboardItem, ItemType};
+
+fn rgba_to_png(width: u32, height: u32, rgba_bytes: &[u8]) -> Option<Vec<u8>> {
+    let img_buf = image::RgbaImage::from_raw(width, height, rgba_bytes.to_vec())?;
+    let dynamic_img = image::DynamicImage::ImageRgba8(img_buf);
+    let mut png_bytes = Vec::new();
+    dynamic_img
+        .write_to(&mut Cursor::new(&mut png_bytes), image::ImageFormat::Png)
+        .ok()?;
+    Some(png_bytes)
+}
 
 pub struct ClipboardListener {
     stop_signal: Arc<AtomicBool>,
@@ -50,13 +61,16 @@ impl ClipboardListener {
 
                     if last_image_hash != Some(hash) {
                         last_image_hash = Some(hash);
-                        let rgba_bytes = img.bytes.to_vec();
-                        let item = ClipboardItem::new_image(
-                            img.width as u32,
-                            img.height as u32,
-                            rgba_bytes,
-                        );
-                        let _ = sender.send(item);
+                        if let Some(png_bytes) =
+                            rgba_to_png(img.width as u32, img.height as u32, &img.bytes)
+                        {
+                            let item = ClipboardItem::new_image(
+                                img.width as u32,
+                                img.height as u32,
+                                png_bytes,
+                            );
+                            let _ = sender.send(item);
+                        }
                     }
                 }
 
@@ -81,16 +95,20 @@ pub fn copy_item_to_clipboard(item: &ClipboardItem) -> Result<(), Box<dyn std::e
             cb.set_text(text)?;
         }
         ItemType::Image {
-            width,
-            height,
-            rgba_bytes,
+            png_bytes,
+            ..
         } => {
-            let img = arboard::ImageData {
-                width: *width as usize,
-                height: *height as usize,
-                bytes: std::borrow::Cow::Borrowed(rgba_bytes),
-            };
-            cb.set_image(img)?;
+            if let Ok(dyn_img) = image::load_from_memory(png_bytes) {
+                let rgba = dyn_img.into_rgba8();
+                let (w, h) = rgba.dimensions();
+                let raw_bytes = rgba.into_raw();
+                let img = arboard::ImageData {
+                    width: w as usize,
+                    height: h as usize,
+                    bytes: std::borrow::Cow::Owned(raw_bytes),
+                };
+                cb.set_image(img)?;
+            }
         }
     }
     Ok(())

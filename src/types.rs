@@ -6,7 +6,7 @@ pub enum ItemType {
     Image {
         width: u32,
         height: u32,
-        rgba_bytes: Vec<u8>,
+        png_bytes: Vec<u8>,
     },
 }
 
@@ -28,23 +28,16 @@ impl ClipboardItem {
         }
     }
 
-    pub fn new_image(width: u32, height: u32, rgba_bytes: Vec<u8>) -> Self {
+    pub fn new_image(width: u32, height: u32, png_bytes: Vec<u8>) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             timestamp: chrono::Utc::now().timestamp_millis(),
             item_type: ItemType::Image {
                 width,
                 height,
-                rgba_bytes,
+                png_bytes,
             },
             pinned: false,
-        }
-    }
-
-    pub fn preview_text(&self) -> String {
-        match &self.item_type {
-            ItemType::Text(t) => t.clone(),
-            ItemType::Image { width, height, .. } => format!("[Image {}x{}]", width, height),
         }
     }
 }

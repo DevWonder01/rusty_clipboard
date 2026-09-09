@@ -12,8 +12,8 @@ pub struct SymbolItem {
     pub category: SymbolCategory,
 }
 
-pub fn get_emojis() -> Vec<EmojiItem> {
-    vec![
+pub fn get_emojis() -> &'static [EmojiItem] {
+    &[
         // Smileys
         EmojiItem { char: "😀", name: "grinning face", category: EmojiCategory::Smileys },
         EmojiItem { char: "😃", name: "grinning face with big eyes", category: EmojiCategory::Smileys },
@@ -183,8 +183,8 @@ pub fn get_emojis() -> Vec<EmojiItem> {
     ]
 }
 
-pub fn get_symbols() -> Vec<SymbolItem> {
-    vec![
+pub fn get_symbols() -> &'static [SymbolItem] {
+    &[
         // Currency
         SymbolItem { symbol: "$", name: "dollar sign", category: SymbolCategory::Currency },
         SymbolItem { symbol: "€", name: "euro sign", category: SymbolCategory::Currency },
